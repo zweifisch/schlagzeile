@@ -9,62 +9,51 @@ from blessings import Terminal
 
 from schlag import Mappers, Scrapers
 
-def init_cache():
-	cache_opts = {
-		 'cache.type'     : 'file',
-		 'cache.data_dir' : '/tmp/cache/data',
-		 'cache.lock_dir' : '/tmp/cache/lock'
-	}
-	cm = CacheManager(**parse_cache_config_options(cache_opts))
-	return cm.get_cache('schlagzeile',expire=600)
+class Schlagzeile():
 
-def get_config():
-	site_files = [
-		os.path.dirname(os.path.realpath(sys.argv[0]))+os.path.sep+'.schlagzeile.json',
-		os.path.dirname(os.path.realpath(sys.argv[0]))+os.path.sep+'schlagzeile.json',
-		os.path.expanduser('~')+os.path.sep+'.schlagzeile.json',
-	]
-	while len(site_files)>0:
-		site_file = site_files.pop()
-		if(os.path.exists(site_file)):
-			return site_file
-	return False
+	def init_cache(self):
+		cache_opts = {
+			 'cache.type'     : 'file',
+			 'cache.data_dir' : '/tmp/cache/data',
+			 'cache.lock_dir' : '/tmp/cache/lock'
+		}
+		cm = CacheManager(**parse_cache_config_options(cache_opts))
+		return cm.get_cache('schlagzeile',expire=600)
 
-def main():
-	site_file = get_config()
-	if(not site_file):
-		print "schlagzeile.json not found"
-		sys.exit(1)
+	def get_config(self):
+		site_files = [
+			os.path.dirname(os.path.realpath(sys.argv[0]))+os.path.sep+'.schlagzeile.json',
+			os.path.dirname(os.path.realpath(sys.argv[0]))+os.path.sep+'schlagzeile.json',
+			os.path.expanduser('~')+os.path.sep+'.schlagzeile.json',
+		]
+		while len(site_files)>0:
+			site_file = site_files.pop()
+			if(os.path.exists(site_file)):
+				return site_file
+		return False
 
-	with open(site_file) as fp:
-		sites = json.load(fp)
-
-	cache = init_cache()
-
-	mappers = Mappers()
-	scrapers = Scrapers()
-	term = Terminal()
-
-	for site_name,site in sites.items():
+	def process_site(self,site_name,site):
 		url = site.get('url')
-		scraper = getattr(scrapers, str(site.get('type')), None)
+		scraper = getattr(self.scrapers, str(site.get('type')), None)
 		pattern = site.get('pattern')
-		if scraper is None: continue
+		if scraper is None: return
+
+		if (os.system('echo "%s" | figlet -f slant' % site_name) != 0):
+			print site_name,"\n",'='*len(site_name)
 
 		def get_raw_html():
 			return str(pq(url))
 
-		markup = cache.get(key=url, createfunc=get_raw_html)
+		markup = self.cache.get(key=url, createfunc=get_raw_html)
 		pattern.update({'markup':markup})
 
-		print site_name,"\n",'='*len(site_name)
 
 		items = scraper(**pattern)
 
 		if site.get('mapper'):
 			for key,mappers_list in site.get('mapper').items():
 				for mapper_type,arg in mappers_list:
-					mapper_factory = getattr(mappers,str(mapper_type)+'_mapper',None)
+					mapper_factory = getattr(self.mappers,str(mapper_type)+'_mapper',None)
 					if mapper_factory:
 						items = map(mapper_factory(key,arg),items)
 
@@ -73,7 +62,7 @@ def main():
 				item['link'] = ''
 			else:
 				if(item['link'][0:4]!='http'): item['link'] = url+item['link']
-			item['title'] = term.cyan(item['title'])
+			item['title'] = self.term.cyan(item['title'])
 			item.update({
 				'index':index+1,
 				'indent':' ' * (len(str(index+1))+2)})
@@ -81,6 +70,61 @@ def main():
 				print "%(index)d. %(supertitle)s - %(title)s\n%(indent)s%(link)s" % item
 			else:
 				print "%(index)d. %(title)s\n%(indent)s%(link)s" % item
+
+	def init(self):
+		site_file = self.get_config()
+		if(not site_file):
+			print "schlagzeile.json not found"
+			sys.exit(1)
+
+		with open(site_file) as fp:
+			self.sites = json.load(fp)
+
+		self.cache = self.init_cache()
+
+		self.mappers = Mappers()
+		self.scrapers = Scrapers()
+		self.term = Terminal()
+
+	def output(self,items,**kargs):
+		if(kargs.get('number')):
+			for index,item in enumerate(items):
+				print "%d. %s" % (index+1,item)
+
+	def cmd_all(self):
+		for site_name,site in self.sites.items():
+			self.process_site(site_name,site)
+
+
+	def cmd_list(self,*args):
+		if(len(args) == 0):
+			self.output(self.sites.keys(),number=True)
+		else:
+			for site_name,site in self.sites.items():
+				if site_name in args:
+					self.process_site(site_name,site)
+
+	def execute(self,cmd,*args):
+		self.init()
+		commands = {
+			'all': self.cmd_all,
+			'ls': self.cmd_list,
+			'list': self.cmd_list,
+		}
+		command = commands.get(cmd)
+		if command:
+			command(*args)
+		else:
+			sys.exit(1)
+
+
+def main():
+	if(len(sys.argv)>1):
+		argv = sys.argv[1:]
+	else:
+		argv = ['all']
+	schlagzeile = Schlagzeile()
+	schlagzeile.execute(*argv)
 
 if __name__ == '__main__':
 	main()
