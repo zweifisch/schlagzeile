@@ -122,7 +122,7 @@ def main():
 	if(len(sys.argv)>1):
 		argv = sys.argv[1:]
 	else:
-		argv = ['all']
+		argv = ['ls']
 	schlagzeile = Schlagzeile()
 	schlagzeile.execute(*argv)
 
