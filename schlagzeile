@@ -6,18 +6,8 @@ from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
 
 from blessings import Terminal
-term = Terminal()
 
-def hierachical(**kargs):
-	markup,supertitle,title,block,link = map(
-			lambda x: kargs.get(x).encode('utf-8'),
-			['markup','supertitle','title','block','link'])
-	html = pq(markup)
-	return [{
-		"supertitle":pqblock(supertitle).text(),
-		"title":pqblock(title).text(),
-		"link":pqblock(link).attr('href')}
-		for pqblock in map(pq,html(block))]
+from schlag import Mappers, Scrapers
 
 def init_cache():
 	cache_opts = {
@@ -40,9 +30,6 @@ def get_config():
 			return site_file
 	return False
 
-
-processors = {'hierachical':hierachical}
-
 def main():
 	site_file = get_config()
 	if(not site_file):
@@ -54,11 +41,15 @@ def main():
 
 	cache = init_cache()
 
+	mappers = Mappers()
+	scrapers = Scrapers()
+	term = Terminal()
+
 	for site_name,site in sites.items():
 		url = site.get('url')
-		processor = processors.get(site.get('type'))
+		scraper = getattr(scrapers, str(site.get('type')), None)
 		pattern = site.get('pattern')
-		if processor is None: continue
+		if scraper is None: continue
 
 		def get_raw_html():
 			return str(pq(url))
@@ -68,17 +59,29 @@ def main():
 
 		print site_name,"\n",'='*len(site_name)
 
-		for index,item in enumerate(processor(**pattern)):
+		items = scraper(**pattern)
+
+		if site.get('mapper'):
+			for key,mappers_list in site.get('mapper').items():
+				for mapper_type,arg in mappers_list:
+					mapper_factory = getattr(mappers,str(mapper_type)+'_mapper',None)
+					if mapper_factory:
+						items = map(mapper_factory(key,arg),items)
+
+		for index,item in enumerate(items):
 			if not item['link'] :
 				item['link'] = ''
 			else:
 				if(item['link'][0:4]!='http'): item['link'] = url+item['link']
-			# item['link'] = term.underline(item['link'])
 			item['title'] = term.cyan(item['title'])
 			item.update({
 				'index':index+1,
 				'indent':' ' * (len(str(index+1))+2)})
-			print "%(index)d. %(supertitle)s - %(title)s\n%(indent)s%(link)s" % item
+			if(item.get('supertitle')):
+				print "%(index)d. %(supertitle)s - %(title)s\n%(indent)s%(link)s" % item
+			else:
+				print "%(index)d. %(title)s\n%(indent)s%(link)s" % item
 
 if __name__ == '__main__':
 	main()
+
