@@ -1,0 +1,25 @@
+{
+    "bild": {
+        "url": "http://www.bild.de/"
+    }, 
+    "spiegel": {
+        "pattern": {
+            "block": ".spTopThema", 
+            "supertitle": "h2", 
+            "title": "h3",
+				"link": "p a"
+        }, 
+        "type": "hierachical", 
+        "url": "http://spiegel.de"
+    }, 
+    "zeit": {
+        "pattern": {
+            "block": ".innerteaser", 
+            "supertitle": ".supertitle", 
+            "title": ".title",
+				"link": "p a"
+        }, 
+        "type": "hierachical", 
+        "url": "http://zeit.de"
+    }
+}

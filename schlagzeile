@@ -1,0 +1,84 @@
+#!/usr/bin/env python2
+import sys, os, json
+from pyquery import PyQuery as pq
+
+from beaker.cache import CacheManager
+from beaker.util import parse_cache_config_options
+
+from blessings import Terminal
+term = Terminal()
+
+def hierachical(**kargs):
+	markup,supertitle,title,block,link = map(
+			lambda x: kargs.get(x).encode('utf-8'),
+			['markup','supertitle','title','block','link'])
+	html = pq(markup)
+	return [{
+		"supertitle":pqblock(supertitle).text(),
+		"title":pqblock(title).text(),
+		"link":pqblock(link).attr('href')}
+		for pqblock in map(pq,html(block))]
+
+def init_cache():
+	cache_opts = {
+		 'cache.type'     : 'file',
+		 'cache.data_dir' : '/tmp/cache/data',
+		 'cache.lock_dir' : '/tmp/cache/lock'
+	}
+	cm = CacheManager(**parse_cache_config_options(cache_opts))
+	return cm.get_cache('schlagzeile',expire=600)
+
+def get_config():
+	site_files = [
+		os.path.dirname(os.path.realpath(sys.argv[0]))+os.path.sep+'.schlagzeile.json',
+		os.path.dirname(os.path.realpath(sys.argv[0]))+os.path.sep+'schlagzeile.json',
+		os.path.expanduser('~')+os.path.sep+'.schlagzeile.json',
+	]
+	while len(site_files)>0:
+		site_file = site_files.pop()
+		if(os.path.exists(site_file)):
+			return site_file
+	return False
+
+
+processors = {'hierachical':hierachical}
+
+def main():
+	site_file = get_config()
+	if(not site_file):
+		print "schlagzeile.json not found"
+		sys.exit(1)
+
+	with open(site_file) as fp:
+		sites = json.load(fp)
+
+	cache = init_cache()
+
+	for site_name,site in sites.items():
+		url = site.get('url')
+		processor = processors.get(site.get('type'))
+		pattern = site.get('pattern')
+		if processor is None: continue
+
+		def get_raw_html():
+			return str(pq(url))
+
+		markup = cache.get(key=url, createfunc=get_raw_html)
+		pattern.update({'markup':markup})
+
+		print site_name,"\n",'='*len(site_name)
+
+		for index,item in enumerate(processor(**pattern)):
+			if not item['link'] :
+				item['link'] = ''
+			else:
+				if(item['link'][0:4]!='http'): item['link'] = url+item['link']
+			# item['link'] = term.underline(item['link'])
+			item['title'] = term.cyan(item['title'])
+			item.update({
+				'index':index+1,
+				'indent':' ' * (len(str(index+1))+2)})
+			print "%(index)d. %(supertitle)s - %(title)s\n%(indent)s%(link)s" % item
+
+if __name__ == '__main__':
+	main()
