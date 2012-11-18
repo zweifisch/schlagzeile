@@ -1,4 +1,4 @@
-# Schlazeile
+# Schlagzeile
 
 headlines on commandline
 
@@ -16,6 +16,8 @@ $ schlagzeile ls zeit
  / /_/  __/ / /_
 /___/\___/_/\__/
 
+1. headlines...
+   link...
 ...
 
 $ schlagzeile all
