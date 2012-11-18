@@ -2,12 +2,15 @@
 
 headlines on commandline
 
+pip install schlagzeile
+
 ## usage
     
 ```sh
 $ schlagzeile ls
 1. zeit
 2. solidot
+...
 
 $ schlagzeile ls zeit
 				 _ __
@@ -19,6 +22,8 @@ $ schlagzeile ls zeit
 1. headlines...
    link...
 ...
-
-$ schlagzeile all
 ```
+
+## more sites
+
+edit `~/.schlagzeile.json`
