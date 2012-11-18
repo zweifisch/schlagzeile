@@ -20,6 +20,17 @@ from . import Mappers
 from . import Scrapers
 
 
+def determine_path():
+	try:
+		root = __file__
+		if os.path.islink(root):
+			root = os.path.realpath(root)
+		return os.path.dirname(os.path.abspath(root))
+	except:
+		print("can't locate configuration")
+		return False
+
+
 class Schlagzeile():
 
 	def init_cache(self):
@@ -31,14 +42,22 @@ class Schlagzeile():
 		return cm.get_cache('schlagzeile', expire=600)
 
 	def get_config(self):
+		user_config_file = os.path.expanduser('~') + os.path.sep + '.schlagzeile.json'
 		site_files = [
 				os.path.dirname(os.path.realpath(sys.argv[0])) + os.path.sep + '.schlagzeile.json',
 				os.path.dirname(os.path.realpath(sys.argv[0])) + os.path.sep + 'schlagzeile.json',
-				os.path.expanduser('~') + os.path.sep + '.schlagzeile.json']
+				user_config_file]
 		while len(site_files) > 0:
 			site_file = site_files.pop()
 			if(os.path.exists(site_file)):
 				return site_file
+		else:
+			path = determine_path()
+			if path:
+				with open(user_config_file, 'w') as f:
+					with open(path + os.path.sep + 'schlagzeile.json') as config_example:
+						f.write(config_example.read())
+				return user_config_file
 		return False
 
 	def process_site(self, site_name, site):
